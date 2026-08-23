@@ -9,7 +9,7 @@ class BaseModel(models.Model):
     TenantScopedModel below). Gives every table a UUID PK and
     created_at/updated_at for free, consistently.
 
-    NOTE: per the architecture doc (§5, §26), a handful of high-volume,
+    NOTE:A handful of high-volume,
     never-URL-exposed models (AuditLog, Notification) deliberately use a
     bigint PK instead — those models should NOT inherit from BaseModel;
     define their own `id = models.BigAutoField(primary_key=True)`.
