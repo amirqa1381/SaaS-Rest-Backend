@@ -40,7 +40,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     # Domain apps get added here as milestones land, e.g.:
-    # "apps.accounts",
+    "apps.accounts",
     # "apps.organizations",
     # "apps.projects",
     # "apps.tasks",

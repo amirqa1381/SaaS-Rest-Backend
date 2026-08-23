@@ -32,6 +32,7 @@ services:
              python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./src:/app/src
+    user: "${UID}:${GID}"
     ports:
       - "8000:8000"
     env_file: .env
@@ -48,6 +49,7 @@ services:
     command: celery -A config worker -l info
     volumes:
       - ./src:/app/src
+    user: "${UID}:${GID}"
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.dev
@@ -63,6 +65,7 @@ services:
     volumes:
       - ./src:/app/src
     env_file: .env
+    user: "${UID}:${GID}"
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.dev
     depends_on:
