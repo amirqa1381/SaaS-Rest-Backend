@@ -5,12 +5,12 @@ from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from apps.accounts.models import User
 
 class AdminUserChangeForm(UserChangeForm):
-    class Meta:
+    class Meta(UserChangeForm.Meta):
         model = User
         fields = '__all__'
 
 class AdminUserCreationForm(UserCreationForm):
-    class Meta:
+    class Meta(UserCreationForm.Meta):
         model = User
         fields = ("email",)
 
