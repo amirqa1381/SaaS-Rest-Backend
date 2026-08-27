@@ -26,3 +26,6 @@ def register_user(*, email: str, password: str, first_name: str = "", last_name:
         return user
     except IntegrityError:
         raise EmailAlreadyRegisteredError(f"The email '{normalized_email}' is already registered.")
+
+
+

@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Install dependencies first (separate layer -> cached unless pyproject/lock change)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --frozen --no-install-project
 
 # Now copy the actual source (manage.py lives inside src/)
 COPY src ./src
