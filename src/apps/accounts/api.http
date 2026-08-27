@@ -1,11 +1,28 @@
 ### register
 
-POST http://localhost:8000/api/v1/auth/register/
+# POST http://localhost:8000/api/v1/auth/register/
+# Content-Type: application/json
+
+# {
+#     "email": "johndoe@example.com",
+#     "password": "johndoe123",
+#     "first_name": "John",
+#     "last_name": "Doe"
+# }
+
+
+
+# POST http://localhost:8000/api/v1/auth/token/refresh/
+# Content-Type: application/json
+
+# {
+#     "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4ODQyNzc3NSwiaWF0IjoxNzg3ODIyOTc1LCJqdGkiOiJlZTBmYWY5NmIxYjQ0YzBjYTEzNTEwNDBjMDgzMWM3NCIsInVzZXJfaWQiOiJlOThiNDgyMy1iZTIxLTQzNGQtODhmNi1kODQzODc3NjZjNGEifQ.R06wwGAfssL9ORDmqIWMPIfx-3HTbUAwGfWIsNfLE4Q"
+# }
+
+
+POST http://localhost:8000/api/v1/auth/token/refresh/
 Content-Type: application/json
 
 {
-    "email": "johndoe@example.com",
-    "password": "johndoe123",
-    "first_name": "John",
-    "last_name": "Doe"
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4ODQyNzc3NSwiaWF0IjoxNzg3ODIyOTc1LCJqdGkiOiJlZTBmYWY5NmIxYjQ0YzBjYTEzNTEwNDBjMDgzMWM3NCIsInVzZXJfaWQiOiJlOThiNDgyMy1iZTIxLTQzNGQtODhmNi1kODQzODc3NjZjNGEifQ.R06wwGAfssL9ORDmqIWMPIfx-3HTbUAwGfWIsNfLE4Q"
 }
