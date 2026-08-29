@@ -36,7 +36,7 @@ class AbstractTokenModel(BaseModel):
     """
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name="%(class)ss")
-    token_hash = models.CharField(max_length=255, unique=True)
+    token_hash = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
 
