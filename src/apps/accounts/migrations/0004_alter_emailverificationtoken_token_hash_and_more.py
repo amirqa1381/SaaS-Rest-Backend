@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0003_emailverificationtoken_passwordresettoken'),
+        ("accounts", "0003_emailverificationtoken_passwordresettoken"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='emailverificationtoken',
-            name='token_hash',
+            model_name="emailverificationtoken",
+            name="token_hash",
             field=models.CharField(max_length=64, unique=True),
         ),
         migrations.AlterField(
-            model_name='passwordresettoken',
-            name='token_hash',
+            model_name="passwordresettoken",
+            name="token_hash",
             field=models.CharField(max_length=64, unique=True),
         ),
     ]

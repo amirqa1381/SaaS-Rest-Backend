@@ -3,6 +3,7 @@ Base settings shared by every environment.
 Environment-specific files (dev.py / prod.py / test.py) import * from here
 and override only what needs to differ.
 """
+
 from datetime import timedelta
 from pathlib import Path
 
@@ -88,7 +89,10 @@ ASGI_APPLICATION = "config.asgi.application"
 # Database (Postgres everywhere, incl. tests — see test.py)
 # --------------------------------------------------------------------------
 DATABASES = {
-    "default": env.db("DATABASE_URL", default="postgres://postgres:postgres@localhost:5432/saas_backend"),
+    "default": env.db(
+        "DATABASE_URL",
+        default="postgres://postgres:postgres@localhost:5432/saas_backend",
+    ),
 }
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
@@ -96,7 +100,9 @@ DATABASES["default"]["ATOMIC_REQUESTS"] = True
 # Auth
 # --------------------------------------------------------------------------
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -126,9 +132,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),

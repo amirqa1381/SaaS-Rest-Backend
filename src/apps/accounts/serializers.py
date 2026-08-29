@@ -10,12 +10,11 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = fields  # All fields are read-only for this serializer
 
 
-
-
 class RegisterSerializer(serializers.Serializer):
     """
     Serializer for user registration.
     """
+
     email = serializers.EmailField(max_length=255)
     password = serializers.CharField(write_only=True, validators=[validate_password])
     first_name = serializers.CharField(max_length=30, required=False, allow_blank=True)

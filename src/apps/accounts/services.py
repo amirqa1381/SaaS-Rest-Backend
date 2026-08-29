@@ -2,15 +2,14 @@ import hashlib
 import secrets
 from datetime import timedelta
 from django.utils import timezone
-from django.contrib.auth.password_validation  import validate_password
+from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
 from django.contrib.auth import get_user_model
 
 from apps.accounts.models import EmailVerificationToken, PasswordResetToken
-
+from apps.accounts.tasks import send_email_verification_email
 
 User = get_user_model()
-
 
 
 # ============== configurations ================
@@ -22,21 +21,19 @@ PASSWORD_RESET_TTL = timedelta(hours=1)
 
 # ================= Exceptions =====================
 
+
 class InvalidOrExpiredTokenError(Exception):
     """Domain error: token is invalid or has expired."""
+
     pass
-
-
-
 
 
 class EmailAlreadyRegisteredError(Exception):
     """Domain error: registration attempted with an email that already exists."""
 
 
-
-
 #  ================== helpers =====================
+
 
 def _generate_token() -> str:
     """Raw, unguessable token — this is what gets emailed to the user.
@@ -47,30 +44,6 @@ def _generate_token() -> str:
 def _hash_token(token: str) -> str:
     """SHA-256 hex digest — matches token_hash's max_length=64 on AbstractToken."""
     return hashlib.sha256(token.encode()).hexdigest()
-
-
-# ================== register user =====================
-
-@transaction.atomic
-def register_user(*, email: str, password: str, first_name: str = "", last_name: str = "") -> User:
-    """
-    Register a new user with the provided email, password, first name, and last name.
-    Raises EmailAlreadyRegisteredError if the email is already in use.
-    """
-    normalized_email = email.strip().lower()  # Normalize email to lowercase
-    if User.objects.filter(email=normalized_email).exists():
-        raise EmailAlreadyRegisteredError(f"The email '{normalized_email}' is already registered.")
-    try:
-        user = User.objects.create_user(
-            email=normalized_email,
-            password=password,
-            first_name=first_name.strip(),
-            last_name=last_name.strip(),
-        )
-        return user
-    except IntegrityError:
-        raise EmailAlreadyRegisteredError(f"The email '{normalized_email}' is already registered.")
-
 
 
 # ================== email verification ==================
@@ -88,9 +61,7 @@ def issue_email_verification_token(user: User) -> str:
     expires_at = timezone.now() + EMAIL_VERIFICATION_TTL
 
     EmailVerificationToken.objects.create(
-        user=user,
-        token_hash=token_hash,
-        expires_at=expires_at
+        user=user, token_hash=token_hash, expires_at=expires_at
     )
     return raw_token
 
@@ -104,12 +75,18 @@ def verify_email_token(token: str) -> User:
     token_hash = _hash_token(token)
     with transaction.atomic():
         try:
-            token_obj = EmailVerificationToken.objects.select_for_update().select_related("user").get(token_hash=token_hash)
+            token_obj = (
+                EmailVerificationToken.objects.select_for_update()
+                .select_related("user")
+                .get(token_hash=token_hash)
+            )
         except EmailVerificationToken.DoesNotExist:
             raise InvalidOrExpiredTokenError("The provided token is invalid.")
 
         if not token_obj.is_valid:
-            raise InvalidOrExpiredTokenError("The provided token is either expired or already used.")
+            raise InvalidOrExpiredTokenError(
+                "The provided token is either expired or already used."
+            )
 
         # Mark the token as used
         token_obj.mark_used()
@@ -122,8 +99,8 @@ def verify_email_token(token: str) -> User:
     return user
 
 
-
 # ================== password reset ==================
+
 
 def request_password_reset(email: str) -> str:
     """
@@ -142,13 +119,10 @@ def request_password_reset(email: str) -> str:
     expires_at = timezone.now() + PASSWORD_RESET_TTL
 
     PasswordResetToken.objects.create(
-        user=user,
-        token_hash=token_hash,
-        expires_at=expires_at
+        user=user, token_hash=token_hash, expires_at=expires_at
     )
 
     return raw_token
-
 
 
 def reset_password(token: str, new_password: str) -> User:
@@ -160,13 +134,19 @@ def reset_password(token: str, new_password: str) -> User:
 
     with transaction.atomic():
         try:
-            token_obj = PasswordResetToken.objects.select_for_update().select_related("user").get(token_hash=token_hash)
+            token_obj = (
+                PasswordResetToken.objects.select_for_update()
+                .select_related("user")
+                .get(token_hash=token_hash)
+            )
         except PasswordResetToken.DoesNotExist:
             raise InvalidOrExpiredTokenError("The provided token is invalid.")
 
         if not token_obj.is_valid:
-            raise InvalidOrExpiredTokenError("The provided token is either expired or already used.")
-        
+            raise InvalidOrExpiredTokenError(
+                "The provided token is either expired or already used."
+            )
+
         # Mark the token as used
         token_obj.mark_used()
 
@@ -182,3 +162,44 @@ def reset_password(token: str, new_password: str) -> User:
             .update(used_at=timezone.now())  # Mark all other unused tokens as used
         )
     return user
+
+
+# ================== register user =====================
+
+
+@transaction.atomic
+def register_user(
+    *, email: str, password: str, first_name: str = "", last_name: str = ""
+) -> User:
+    """
+    Register a new user with the provided email, password, first name, and last name.
+    Raises EmailAlreadyRegisteredError if the email is already in use.
+    """
+    normalized_email = email.strip().lower()  # Normalize email to lowercase
+    if User.objects.filter(email=normalized_email).exists():
+        raise EmailAlreadyRegisteredError(
+            f"The email '{normalized_email}' is already registered."
+        )
+    try:
+        user = User.objects.create_user(
+            email=normalized_email,
+            password=password,
+            first_name=first_name.strip(),
+            last_name=last_name.strip(),
+        )
+
+        email_verification_token = issue_email_verification_token(
+            user
+        )  # Issue email verification token for the new user
+        verification_url = (
+            f"http://localhost:8000/verify-email" f"?token={email_verification_token}"
+        )
+        send_email_verification_email.delay_on_commit(
+            user.email, verification_url
+        )  # Send verification email asynchronously
+
+        return user
+    except IntegrityError:
+        raise EmailAlreadyRegisteredError(
+            f"The email '{normalized_email}' is already registered."
+        )
