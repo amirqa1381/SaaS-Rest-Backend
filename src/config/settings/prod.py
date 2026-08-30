@@ -2,7 +2,9 @@ from .base import *  # noqa: F401,F403
 from .base import env
 
 DEBUG = False
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")  # required, no wildcard default in prod
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS"
+)  # required, no wildcard default in prod
 
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True

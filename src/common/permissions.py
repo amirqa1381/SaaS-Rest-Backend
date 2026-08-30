@@ -5,6 +5,7 @@ Fleshed out in Milestone 4 alongside the organizations app (Membership
 model doesn't exist yet in this bootstrap milestone). Left as a stub here
 so the import path is stable from the start.
 """
+
 from rest_framework.permissions import BasePermission
 
 

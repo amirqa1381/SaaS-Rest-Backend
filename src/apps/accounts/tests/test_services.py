@@ -59,6 +59,8 @@ class TestRegisterUser:
         assert User.objects.filter(email="atomic@example.com").count() == 1
 
     def test_returns_a_persisted_user_instance(self):
-        user = register_user(email="persisted@example.com", password="S0meStr0ngP@ssword!")
+        user = register_user(
+            email="persisted@example.com", password="S0meStr0ngP@ssword!"
+        )
 
         assert User.objects.filter(pk=user.pk).exists()

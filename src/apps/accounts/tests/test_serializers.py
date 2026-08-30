@@ -81,7 +81,9 @@ class TestUserSerializer:
         assert data["email"] == "ser@example.com"
 
     def test_password_is_never_exposed(self):
-        user = User.objects.create_user(email="nopass@example.com", password="pass12345")
+        user = User.objects.create_user(
+            email="nopass@example.com", password="pass12345"
+        )
 
         data = UserSerializer(user).data
 

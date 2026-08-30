@@ -19,7 +19,6 @@ class TestAccountsUrls:
 
         assert url.endswith("/token/")
 
-
     def test_token_refresh_url_resolves_by_name(self):
         url = reverse("accounts:token_refresh")
 
@@ -31,6 +30,11 @@ class TestAccountsUrls:
         assert url.endswith("/logout/")
 
     def test_all_expected_url_names_are_registered(self):
-        for name in ["register", "token_obtain_pair", "token_refresh", "token_blacklist"]:
+        for name in [
+            "register",
+            "token_obtain_pair",
+            "token_refresh",
+            "token_blacklist",
+        ]:
             url = reverse(f"accounts:{name}")
             assert url is not None

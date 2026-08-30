@@ -3,7 +3,9 @@ from django.apps import apps as django_apps
 
 pytestmark = pytest.mark.django_db
 
-BLACKLIST_APP_INSTALLED = django_apps.is_installed("rest_framework_simplejwt.token_blacklist")
+BLACKLIST_APP_INSTALLED = django_apps.is_installed(
+    "rest_framework_simplejwt.token_blacklist"
+)
 
 
 class TestTokenObtainPairView:
@@ -81,7 +83,9 @@ class TestTokenRefreshView:
         assert response.status_code == 200
         assert "access" in response.data
 
-    def test_refresh_with_invalid_token_returns_401(self, api_client, token_refresh_url):
+    def test_refresh_with_invalid_token_returns_401(
+        self, api_client, token_refresh_url
+    ):
         response = api_client.post(
             token_refresh_url, {"refresh": "not-a-real-token"}, format="json"
         )
@@ -110,7 +114,9 @@ class TestTokenBlacklistView:
 
         assert response.status_code == 400
 
-    def test_logout_with_garbage_token_returns_401(self, api_client, token_blacklist_url):
+    def test_logout_with_garbage_token_returns_401(
+        self, api_client, token_blacklist_url
+    ):
         response = api_client.post(
             token_blacklist_url, {"refresh": "not-a-real-token"}, format="json"
         )
@@ -122,7 +128,12 @@ class TestTokenBlacklistView:
         reason="rest_framework_simplejwt.token_blacklist is not in INSTALLED_APPS",
     )
     def test_logout_blacklists_the_refresh_token(
-        self, api_client, token_obtain_url, token_refresh_url, token_blacklist_url, existing_user
+        self,
+        api_client,
+        token_obtain_url,
+        token_refresh_url,
+        token_blacklist_url,
+        existing_user,
     ):
         refresh_token = self._login(api_client, token_obtain_url, existing_user)
 
