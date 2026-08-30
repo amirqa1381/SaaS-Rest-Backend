@@ -25,3 +25,19 @@ class RegisterSerializer(serializers.Serializer):
         Check if the email is already in use.
         """
         return value.strip().lower()  # Normalize email to lowercase
+
+
+class RequestPasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField()
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+    token = serializers.CharField()
