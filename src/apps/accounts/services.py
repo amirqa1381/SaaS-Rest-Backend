@@ -1,13 +1,14 @@
 import hashlib
 import secrets
 from datetime import timedelta
+from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
 from django.contrib.auth import get_user_model
 
 from apps.accounts.models import EmailVerificationToken, PasswordResetToken
-from apps.accounts.tasks import send_email_verification_email
+from apps.accounts.tasks import send_email_verification_email, send_password_reset_email
 
 User = get_user_model()
 
@@ -66,7 +67,7 @@ def issue_email_verification_token(user: User) -> str:
     return raw_token
 
 
-def verify_email_token(token: str) -> User:
+def verify_email_token(*, token: str) -> User:
     """
     Verifies the provided email verification token.
     If valid, marks the token as used and returns the associated user.
@@ -89,7 +90,7 @@ def verify_email_token(token: str) -> User:
             )
 
         # Mark the token as used
-        token_obj.mark_used()
+        token_obj.mark_used
 
         # Mark the user's email as verified
         user = token_obj.user
@@ -102,17 +103,20 @@ def verify_email_token(token: str) -> User:
 # ================== password reset ==================
 
 
-def request_password_reset(email: str) -> str:
+@transaction.atomic
+def request_password_reset(*, email: str) -> str | None:
     """
-    issues a password reset token for the user with the given email.
-    Raises InvalidOrExpiredTokenError if the email does not exist.
+    Issues a password reset token for the user with the given email.
+    Returns the RAW token if a matching active user exists, otherwise
+    returns None. Callers must NOT let a None result change the HTTP
+    response — see request_password_reset docs in views.py.
     """
+    email = email.strip().lower()
 
     try:
         user = User.objects.get(email=email, is_active=True)
-
     except User.DoesNotExist:
-        return None  # Silently ignore if the user does not exist or is inactive
+        return None
 
     raw_token = _generate_token()
     token_hash = _hash_token(raw_token)
@@ -121,6 +125,9 @@ def request_password_reset(email: str) -> str:
     PasswordResetToken.objects.create(
         user=user, token_hash=token_hash, expires_at=expires_at
     )
+
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
+    send_password_reset_email.delay_on_commit(user.email, reset_url)
 
     return raw_token
 
@@ -192,7 +199,7 @@ def register_user(
             user
         )  # Issue email verification token for the new user
         verification_url = (
-            f"http://localhost:8000/verify-email" f"?token={email_verification_token}"
+            f"{settings.FRONTEND_URL}/verify-email" f"?token={email_verification_token}"
         )
         send_email_verification_email.delay_on_commit(
             user.email, verification_url
