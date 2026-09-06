@@ -1,8 +1,11 @@
 import pytest
+from datetime import timedelta
+from django.utils import timezone
 from django.urls import reverse
 from rest_framework.test import APIClient, APIRequestFactory
 
-from apps.accounts.models import User
+from apps.accounts.models import User, EmailVerificationToken, PasswordResetToken
+from apps.accounts.services import _hash_token, issue_email_verification_token
 
 
 @pytest.fixture
@@ -62,3 +65,31 @@ def existing_user(db):
         first_name="Existing",
         last_name="User",
     )
+
+
+@pytest.fixture
+def verify_email_url():
+    return reverse("accounts:verify_email")
+
+
+@pytest.fixture
+def request_password_reset_url():
+    return reverse("accounts:request_password_reset")
+
+
+@pytest.fixture
+def email_verification_token(existing_user):
+    raw_token = issue_email_verification_token(existing_user)
+    return raw_token, existing_user
+
+
+@pytest.fixture
+def password_reset_token(existing_user):
+    raw_token = "valid-raw-reset-token-123456789"
+    token_hash = _hash_token(raw_token)
+    token_obj = PasswordResetToken.objects.create(
+        user=existing_user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(hours=1),
+    )
+    return raw_token, token_obj

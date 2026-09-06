@@ -90,7 +90,7 @@ def verify_email_token(*, token: str) -> User:
             )
 
         # Mark the token as used
-        token_obj.mark_used
+        token_obj.mark_used()
 
         # Mark the user's email as verified
         user = token_obj.user

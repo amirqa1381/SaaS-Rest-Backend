@@ -57,7 +57,7 @@ class AbstractTokenModel(BaseModel):
     def is_valid(self):
         return not self.is_expired and not self.is_used
 
-    @property
+    
     def mark_used(self):
         self.used_at = timezone.now()
         self.save(update_fields=["used_at"])
