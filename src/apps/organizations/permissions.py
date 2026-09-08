@@ -1,7 +1,7 @@
 
 from rest_framework import permissions
 
-from .models import Membership, Organization
+from .models import MemberShip, Organization
 
 
 # Fixed role hierarchy — matches architecture doc §9.
@@ -9,10 +9,10 @@ from .models import Membership, Organization
 # granted/changed" checks in services, and reusable here for permission
 # comparisons.
 ROLE_RANK = {
-    Membership.Role.MEMBER: 0,
-    Membership.Role.MANAGER: 1,
-    Membership.Role.ADMIN: 2,
-    Membership.Role.OWNER: 3,
+    MemberShip.Role.MEMBER: 0,
+    MemberShip.Role.MANAGER: 1,
+    MemberShip.Role.ADMIN: 2,
+    MemberShip.Role.OWNER: 3,
 }
 
 
@@ -20,16 +20,16 @@ def get_active_membership(user, organization):
     """
     Single choke point for "is this user an active member of this org,
     and what's their role" — every permission class and service function
-    should go through this rather than querying Membership directly, so
+    should go through this rather than querying MemberShip directly, so
     there's exactly one place that defines what "active membership" means.
     """
     if not user or not user.is_authenticated or organization is None:
         return None
 
-    return Membership.objects.filter(
+    return MemberShip.objects.filter(
         user=user,
         organization=organization,
-        status=Membership.Status.ACTIVE,
+        status=MemberShip.Status.ACTIVE,
     ).first()
 
 
