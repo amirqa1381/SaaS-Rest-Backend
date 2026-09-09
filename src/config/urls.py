@@ -12,6 +12,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health_check, name="health-check"),
     path("api/v1/auth/", include("apps.accounts.urls")),  # wired up as domain apps land
-    path("api/v1/organizations/", include("apps.organizations.urls"), namespace="organizations"),  # wired up as domain apps land
+    path("api/v1/organizations/", include("apps.organizations.urls")),  # wired up as domain apps land
     # path("api/v1/", include("config.api_urls")),  # wired up as domain apps land
 ]

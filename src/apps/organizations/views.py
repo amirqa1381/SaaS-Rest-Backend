@@ -108,7 +108,7 @@ class OrganizationDetailView(generics.RetrieveUpdateAPIView):
     model from architecture doc §9.
     """
     serializer_class = OrganizationSerializer
-    permission_classes = [IsOrganizationMember, IsObjectInUsersOrganization]
+    permission_classes = [IsOrganizationMember]
     queryset = Organization.objects.all()
 
     def patch(self, request, *args, **kwargs):
