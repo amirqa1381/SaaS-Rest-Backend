@@ -16,6 +16,7 @@ class OrganizationCreateSerializer(serializers.Serializer):
     `name` — slug/status/owner are all derived server-side, never
     accepted from the client.
     """
+
     name = serializers.CharField(max_length=255)
 
 
@@ -25,12 +26,23 @@ class MembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = MemberShip
         fields = [
-            "id", "user", "user_email", "role", "status",
-            "joined_at", "created_at", "updated_at",
+            "id",
+            "user",
+            "user_email",
+            "role",
+            "status",
+            "joined_at",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = [
-            "id", "user", "user_email", "status",
-            "joined_at", "created_at", "updated_at",
+            "id",
+            "user",
+            "user_email",
+            "status",
+            "joined_at",
+            "created_at",
+            "updated_at",
         ]
 
 
@@ -40,6 +52,7 @@ class MembershipRoleUpdateSerializer(serializers.Serializer):
     (e.g. suspending a member) are a separate concern, not handled by
     change_member_role().
     """
+
     role = serializers.ChoiceField(choices=MemberShip.Role.choices)
 
 
@@ -47,7 +60,11 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganizationSettings
         fields = [
-            "id", "default_task_status", "allow_public_signup",
-            "custom_branding", "created_at", "updated_at",
+            "id",
+            "default_task_status",
+            "allow_public_signup",
+            "custom_branding",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]

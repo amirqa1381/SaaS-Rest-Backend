@@ -23,6 +23,7 @@ pytestmark = pytest.mark.django_db
 # create_organization
 # ---------------------------------------------------------------------------
 
+
 class TestCreateOrganization:
     def test_creates_organization_with_given_name(self, user_a):
         org = create_organization(owner=user_a, name="Acme")
@@ -69,6 +70,7 @@ class TestCreateOrganization:
 # update_organization
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateOrganization:
     def test_owner_can_update_name(self, user_a, org_a, membership_a):
         updated = update_organization(actor=user_a, organization=org_a, name="New Name")
@@ -78,21 +80,29 @@ class TestUpdateOrganization:
 
     def test_admin_can_update_name(self, org_a):
         admin_user = UserFactory()
-        MembershipFactory(organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN)
+        MembershipFactory(
+            organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN
+        )
 
-        updated = update_organization(actor=admin_user, organization=org_a, name="New Name")
+        updated = update_organization(
+            actor=admin_user, organization=org_a, name="New Name"
+        )
         assert updated.name == "New Name"
 
     def test_manager_cannot_update_name(self, org_a):
         manager_user = UserFactory()
-        MembershipFactory(organization=org_a, user=manager_user, role=MemberShip.Role.MANAGER)
+        MembershipFactory(
+            organization=org_a, user=manager_user, role=MemberShip.Role.MANAGER
+        )
 
         with pytest.raises(InsufficientRoleError):
             update_organization(actor=manager_user, organization=org_a, name="New Name")
 
     def test_member_cannot_update_name(self, org_a):
         member_user = UserFactory()
-        MembershipFactory(organization=org_a, user=member_user, role=MemberShip.Role.MEMBER)
+        MembershipFactory(
+            organization=org_a, user=member_user, role=MemberShip.Role.MEMBER
+        )
 
         with pytest.raises(InsufficientRoleError):
             update_organization(actor=member_user, organization=org_a, name="New Name")
@@ -110,6 +120,7 @@ class TestUpdateOrganization:
 # update_organization_settings
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateOrganizationSettings:
     def test_owner_can_update_settings(self, user_a, org_a, membership_a):
         updated = update_organization_settings(
@@ -119,7 +130,9 @@ class TestUpdateOrganizationSettings:
 
     def test_member_cannot_update_settings(self, org_a):
         member_user = UserFactory()
-        MembershipFactory(organization=org_a, user=member_user, role=MemberShip.Role.MEMBER)
+        MembershipFactory(
+            organization=org_a, user=member_user, role=MemberShip.Role.MEMBER
+        )
 
         with pytest.raises(InsufficientRoleError):
             update_organization_settings(
@@ -134,12 +147,15 @@ class TestUpdateOrganizationSettings:
 
     def test_raises_on_disallowed_field(self, user_a, org_a, membership_a):
         with pytest.raises(ValueError):
-            update_organization_settings(actor=user_a, organization=org_a, name="hijack")
+            update_organization_settings(
+                actor=user_a, organization=org_a, name="hijack"
+            )
 
 
 # ---------------------------------------------------------------------------
 # change_member_role
 # ---------------------------------------------------------------------------
+
 
 class TestChangeMemberRole:
     def test_owner_can_promote_member_to_manager(self, org_a, membership_a, user_a):
@@ -155,7 +171,9 @@ class TestChangeMemberRole:
 
     def test_admin_can_change_manager_to_member(self, org_a):
         admin_user = UserFactory()
-        MembershipFactory(organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN)
+        MembershipFactory(
+            organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN
+        )
 
         target_user = UserFactory()
         target_membership = MembershipFactory(
@@ -163,7 +181,9 @@ class TestChangeMemberRole:
         )
 
         updated = change_member_role(
-            actor=admin_user, membership=target_membership, new_role=MemberShip.Role.MEMBER
+            actor=admin_user,
+            membership=target_membership,
+            new_role=MemberShip.Role.MEMBER,
         )
         assert updated.role == MemberShip.Role.MEMBER
 
@@ -175,12 +195,16 @@ class TestChangeMemberRole:
 
         with pytest.raises(InsufficientRoleError):
             change_member_role(
-                actor=user_a, membership=target_membership, new_role=MemberShip.Role.OWNER
+                actor=user_a,
+                membership=target_membership,
+                new_role=MemberShip.Role.OWNER,
             )
 
     def test_cannot_change_role_of_equal_rank(self, org_a):
         admin_user = UserFactory()
-        MembershipFactory(organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN)
+        MembershipFactory(
+            organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN
+        )
 
         other_admin_user = UserFactory()
         other_admin_membership = MembershipFactory(
@@ -196,16 +220,22 @@ class TestChangeMemberRole:
 
     def test_cannot_change_role_of_higher_rank(self, org_a, membership_a):
         manager_user = UserFactory()
-        MembershipFactory(organization=org_a, user=manager_user, role=MemberShip.Role.MANAGER)
+        MembershipFactory(
+            organization=org_a, user=manager_user, role=MemberShip.Role.MANAGER
+        )
 
         with pytest.raises(InsufficientRoleError):
             change_member_role(
-                actor=manager_user, membership=membership_a, new_role=MemberShip.Role.MEMBER
+                actor=manager_user,
+                membership=membership_a,
+                new_role=MemberShip.Role.MEMBER,
             )
 
     def test_cannot_promote_to_a_rank_equal_to_actor(self, org_a):
         admin_user = UserFactory()
-        MembershipFactory(organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN)
+        MembershipFactory(
+            organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN
+        )
 
         target_user = UserFactory()
         target_membership = MembershipFactory(
@@ -214,7 +244,9 @@ class TestChangeMemberRole:
 
         with pytest.raises(InsufficientRoleError):
             change_member_role(
-                actor=admin_user, membership=target_membership, new_role=MemberShip.Role.ADMIN
+                actor=admin_user,
+                membership=target_membership,
+                new_role=MemberShip.Role.ADMIN,
             )
 
     def test_actor_cannot_change_own_role(self, org_a, membership_a, user_a):
@@ -231,13 +263,16 @@ class TestChangeMemberRole:
 
         with pytest.raises(NotAMemberError):
             change_member_role(
-                actor=user_b, membership=target_membership, new_role=MemberShip.Role.MANAGER
+                actor=user_b,
+                membership=target_membership,
+                new_role=MemberShip.Role.MANAGER,
             )
 
 
 # ---------------------------------------------------------------------------
 # remove_member
 # ---------------------------------------------------------------------------
+
 
 class TestRemoveMember:
     def test_owner_can_remove_member(self, org_a, membership_a, user_a):
@@ -252,14 +287,18 @@ class TestRemoveMember:
 
     def test_admin_cannot_remove_owner(self, org_a, membership_a):
         admin_user = UserFactory()
-        MembershipFactory(organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN)
+        MembershipFactory(
+            organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN
+        )
 
         with pytest.raises(InsufficientRoleError):
             remove_member(actor=admin_user, membership=membership_a)
 
     def test_cannot_remove_equal_rank(self, org_a):
         admin_user = UserFactory()
-        MembershipFactory(organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN)
+        MembershipFactory(
+            organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN
+        )
 
         other_admin_membership = MembershipFactory(
             organization=org_a, user=UserFactory(), role=MemberShip.Role.ADMIN
@@ -268,9 +307,9 @@ class TestRemoveMember:
         with pytest.raises(InsufficientRoleError):
             remove_member(actor=admin_user, membership=other_admin_membership)
 
-    
-
-    def test_can_remove_an_owner_if_another_owner_remains(self, org_a, membership_a, user_a):
+    def test_can_remove_an_owner_if_another_owner_remains(
+        self, org_a, membership_a, user_a
+    ):
         second_owner_user = UserFactory()
         second_owner_membership = MembershipFactory(
             organization=org_a, user=second_owner_user, role=MemberShip.Role.OWNER
@@ -300,10 +339,13 @@ class TestRemoveMember:
 # leave_organization
 # ---------------------------------------------------------------------------
 
+
 class TestLeaveOrganization:
     def test_member_can_leave(self, org_a):
         member_user = UserFactory()
-        MembershipFactory(organization=org_a, user=member_user, role=MemberShip.Role.MEMBER)
+        MembershipFactory(
+            organization=org_a, user=member_user, role=MemberShip.Role.MEMBER
+        )
 
         leave_organization(actor=member_user, organization=org_a)
 
@@ -311,9 +353,13 @@ class TestLeaveOrganization:
             organization=org_a, user=member_user
         ).exists()
 
-    def test_owner_can_leave_if_another_owner_remains(self, org_a, membership_a, user_a):
+    def test_owner_can_leave_if_another_owner_remains(
+        self, org_a, membership_a, user_a
+    ):
         second_owner_user = UserFactory()
-        MembershipFactory(organization=org_a, user=second_owner_user, role=MemberShip.Role.OWNER)
+        MembershipFactory(
+            organization=org_a, user=second_owner_user, role=MemberShip.Role.OWNER
+        )
 
         leave_organization(actor=user_a, organization=org_a)
 

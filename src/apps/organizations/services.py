@@ -1,9 +1,7 @@
-
 from django.db import transaction
 from django.utils.text import slugify
 from apps.organizations.models import Organization, MemberShip
 from apps.organizations.permissions import get_active_membership, ROLE_RANK
-
 
 
 class OrganizationServiceError(Exception):
@@ -26,9 +24,7 @@ class CannotActOnSelfError(OrganizationServiceError):
     """Raised when a user tries to change/remove their own membership."""
 
 
-
-
-def create_organization(*,owner,name):
+def create_organization(*, owner, name):
     """
     Creates a new Organization and its founding Membership (role=OWNER)
     atomically. An organization with zero owners must never be an
@@ -36,15 +32,14 @@ def create_organization(*,owner,name):
     """
     with transaction.atomic():
         organization = Organization.objects.create(
-            name=name,
-            slug=_generate_unique_slug(name)
+            name=name, slug=_generate_unique_slug(name)
         )
 
         MemberShip.objects.create(
             organization=organization,
             user=owner,
             role=MemberShip.Role.OWNER,
-            status=MemberShip.Status.ACTIVE
+            status=MemberShip.Status.ACTIVE,
         )
 
     return organization
@@ -68,6 +63,7 @@ def _generate_unique_slug(name):
 
 #  ===================== organization update services =====================
 
+
 def update_organization(*, actor, organization, **fields):
     """
     Updates basic Organization fields (currently just `name`).
@@ -82,17 +78,20 @@ def update_organization(*, actor, organization, **fields):
         raise NotAMemberError("You are not a member of this organization.")
 
     if ROLE_RANK[membership.role] < ROLE_RANK[MemberShip.Role.ADMIN]:
-        raise InsufficientRoleError("Only ADMIN or OWNER can update organization details.")
+        raise InsufficientRoleError(
+            "Only ADMIN or OWNER can update organization details."
+        )
 
     allowed_fields = {"name"}
     for field, value in fields.items():
         if field not in allowed_fields:
-            raise ValueError(f"Cannot update field '{field}' via update_organization().")
+            raise ValueError(
+                f"Cannot update field '{field}' via update_organization()."
+            )
         setattr(organization, field, value)
 
     organization.save(update_fields=list(fields.keys()) + ["updated_at"])
     return organization
-
 
 
 def update_organization_settings(*, actor, organization, **fields):
@@ -106,7 +105,9 @@ def update_organization_settings(*, actor, organization, **fields):
         raise NotAMemberError("You are not a member of this organization.")
 
     if ROLE_RANK[membership.role] < ROLE_RANK[MemberShip.Role.ADMIN]:
-        raise InsufficientRoleError("Only ADMIN or OWNER can update organization settings.")
+        raise InsufficientRoleError(
+            "Only ADMIN or OWNER can update organization settings."
+        )
 
     setting_obj = organization.settings
     allowed_fields = {"default_task_status", "allow_public_signup", "custom_branding"}
@@ -114,15 +115,17 @@ def update_organization_settings(*, actor, organization, **fields):
     # here we loop through the fields to update and check if they are allowed, then set them on the settings object
     for field, value in fields.items():
         if field not in allowed_fields:
-            raise ValueError(f"Cannot update field '{field}' via update_organization_settings().")
+            raise ValueError(
+                f"Cannot update field '{field}' via update_organization_settings()."
+            )
         setattr(setting_obj, field, value)
 
     setting_obj.save(update_fields=list(fields.keys()) + ["updated_at"])
     return setting_obj
 
 
-
 # =================== member role management services ===================
+
 
 def change_member_role(*, actor, membership, new_role):
     """
@@ -140,15 +143,17 @@ def change_member_role(*, actor, membership, new_role):
       and accidental self-demotion with no one else to fix it)
     """
     if new_role == MemberShip.Role.OWNER:
-        raise InsufficientRoleError("OWNER cannot be granted via change_member_role(); "
-        "ownership transfer requires a dedicated, more sensitive flow.")
+        raise InsufficientRoleError(
+            "OWNER cannot be granted via change_member_role(); "
+            "ownership transfer requires a dedicated, more sensitive flow."
+        )
 
     organization = membership.organization
     actor_membership = get_active_membership(actor, organization)
     if actor_membership is None:
         raise NotAMemberError("You are not a member of this organization.")
 
-    if actor_membership.id== membership.id:
+    if actor_membership.id == membership.id:
         raise CannotActOnSelfError("You cannot change your own membership role.")
 
     actor_rank = ROLE_RANK[actor_membership.role]
@@ -165,7 +170,6 @@ def change_member_role(*, actor, membership, new_role):
         membership.save(update_fields=["role", "updated_at"])
 
     return membership
-
 
 
 def remove_member(*, actor, membership):
@@ -208,11 +212,15 @@ def remove_member(*, actor, membership):
 
     with transaction.atomic():
         if membership.role == MemberShip.Role.OWNER:
-            remaining_owners = MemberShip.objects.filter(
-                organization=organization,
-                role=MemberShip.Role.OWNER,
-                status=MemberShip.Status.ACTIVE
-            ).exclude(pk=membership.pk).exists()
+            remaining_owners = (
+                MemberShip.objects.filter(
+                    organization=organization,
+                    role=MemberShip.Role.OWNER,
+                    status=MemberShip.Status.ACTIVE,
+                )
+                .exclude(pk=membership.pk)
+                .exists()
+            )
 
             if not remaining_owners:
                 raise CannotRemoveLastOwnerError(
@@ -220,7 +228,6 @@ def remove_member(*, actor, membership):
                 )
 
         membership.delete()
-
 
 
 def leave_organization(*, actor, organization):
@@ -236,11 +243,15 @@ def leave_organization(*, actor, organization):
 
     with transaction.atomic():
         if actor_membership.role == MemberShip.Role.OWNER:
-            remaining_owners = MemberShip.objects.filter(
-                organization=organization,
-                role=MemberShip.Role.OWNER,
-                status=MemberShip.Status.ACTIVE
-            ).exclude(pk=actor_membership.pk).exists()
+            remaining_owners = (
+                MemberShip.objects.filter(
+                    organization=organization,
+                    role=MemberShip.Role.OWNER,
+                    status=MemberShip.Status.ACTIVE,
+                )
+                .exclude(pk=actor_membership.pk)
+                .exists()
+            )
 
             if not remaining_owners:
                 raise CannotRemoveLastOwnerError(

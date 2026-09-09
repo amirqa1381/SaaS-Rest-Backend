@@ -36,11 +36,12 @@ def _service_error_response(exc):
     if isinstance(exc, (NotAMemberError,)):
         return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
-    if isinstance(exc, (InsufficientRoleError, CannotActOnSelfError, CannotRemoveLastOwnerError)):
+    if isinstance(
+        exc, (InsufficientRoleError, CannotActOnSelfError, CannotRemoveLastOwnerError)
+    ):
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        
-    return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+    return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class OrganizationListCreateView(generics.ListCreateAPIView):
@@ -58,8 +59,8 @@ class OrganizationListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         from rest_framework.permissions import IsAuthenticated
-        return [IsAuthenticated()]
 
+        return [IsAuthenticated()]
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -94,8 +95,6 @@ class OrganizationListCreateView(generics.ListCreateAPIView):
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
-
-
 class OrganizationDetailView(generics.RetrieveUpdateAPIView):
     """
     GET   /api/v1/organizations/{pk}/
@@ -107,6 +106,7 @@ class OrganizationDetailView(generics.RetrieveUpdateAPIView):
     the fetched object against it — the redundant-by-design isolation
     model from architecture doc §9.
     """
+
     serializer_class = OrganizationSerializer
     permission_classes = [IsOrganizationMember]
     queryset = Organization.objects.all()
@@ -133,9 +133,9 @@ class OrganizationSettingsView(generics.RetrieveUpdateAPIView):
     GET   /api/v1/organizations/{organization_pk}/settings/
     PATCH /api/v1/organizations/{organization_pk}/settings/
     """
+
     serializer_class = OrganizationSettingsSerializer
     permission_classes = [IsOrganizationMember]
-
 
     def get_object(self):
         return self.request.organization.settings
@@ -158,6 +158,7 @@ class MembershipListView(generics.ListAPIView):
     """
     GET /api/v1/organizations/{organization_pk}/members/
     """
+
     serializer_class = MembershipSerializer
     permission_classes = [IsOrganizationMember]
 
@@ -165,7 +166,6 @@ class MembershipListView(generics.ListAPIView):
         return MemberShip.objects.filter(
             organization=self.request.organization,
         ).select_related("user")
-
 
 
 class MembershipDetailView(generics.GenericAPIView):
@@ -178,11 +178,14 @@ class MembershipDetailView(generics.GenericAPIView):
     re-checks per §9), so the generic mixins' default save/delete
     behavior isn't a good fit here.
     """
+
     serializer_class = MembershipRoleUpdateSerializer
     permission_classes = [IsOrganizationMember]
 
     def get_object(self):
-        return generics.get_object_or_404(MemberShip, pk=self.kwargs["pk"], organization=self.request.organization)
+        return generics.get_object_or_404(
+            MemberShip, pk=self.kwargs["pk"], organization=self.request.organization
+        )
 
     def patch(self, request, *args, **kwargs):
         membership = self.get_object()
