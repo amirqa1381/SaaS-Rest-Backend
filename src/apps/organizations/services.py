@@ -140,7 +140,8 @@ def change_member_role(*, actor, membership, new_role):
       and accidental self-demotion with no one else to fix it)
     """
     if new_role == MemberShip.Role.OWNER:
-        raise ValueError("Cannot grant OWNER role via change_member_role().")
+        raise InsufficientRoleError("OWNER cannot be granted via change_member_role(); "
+        "ownership transfer requires a dedicated, more sensitive flow.")
 
     organization = membership.organization
     actor_membership = get_active_membership(actor, organization)
@@ -190,10 +191,20 @@ def remove_member(*, actor, membership):
     if actor_membership.id == membership.id:
         raise CannotActOnSelfError("You cannot remove yourself from the organization.")
 
-    if ROLE_RANK[actor_membership.role] <= ROLE_RANK[membership.role]:
-        raise InsufficientRoleError(
-            "You cannot remove a member with a role equal to or above your own."
-        )
+    if membership.role == MemberShip.Role.OWNER:
+        # Owners are peers — only another OWNER may remove an OWNER.
+        # The strict "must outrank" rule below doesn't apply here; the
+        # actual safety net for owners is the last-owner check, not rank.
+        if actor_membership.role != MemberShip.Role.OWNER:
+            raise InsufficientRoleError(
+                "Only an OWNER can remove another OWNER from the organization."
+            )
+
+    else:
+        if ROLE_RANK[actor_membership.role] <= ROLE_RANK[membership.role]:
+            raise InsufficientRoleError(
+                "You cannot remove a member with a role equal to or above your own."
+            )
 
     with transaction.atomic():
         if membership.role == MemberShip.Role.OWNER:
