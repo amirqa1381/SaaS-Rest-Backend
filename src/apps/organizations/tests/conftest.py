@@ -2,7 +2,11 @@ import pytest
 from rest_framework.test import APIClient
 
 from apps.organizations.models import MemberShip
-from apps.organizations.tests.factories import UserFactory, OrganizationFactory, MembershipFactory
+from apps.organizations.tests.factories import (
+    UserFactory,
+    OrganizationFactory,
+    MembershipFactory,
+)
 
 
 @pytest.fixture

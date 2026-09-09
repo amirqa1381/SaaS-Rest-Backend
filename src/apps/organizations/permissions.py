@@ -1,8 +1,6 @@
-
 from rest_framework import permissions
 
 from .models import MemberShip, Organization
-
 
 # Fixed role hierarchy — matches architecture doc §9.
 # Higher number = more privilege. Used for "must outrank the role being
@@ -35,11 +33,20 @@ def get_active_membership(user, organization):
 
 def resolve_organization(view):
     """
-    Resolves the target Organization from the URL for views nested under
-    /organizations/{org_id}/... . Centralized here so every view resolves
-    it the same way instead of each view parsing kwargs differently.
+    Resolves the target Organization from the URL.
+
+    Checks organization_pk/org_id first (nested routes: memberships,
+    settings), and only falls back to `pk` when neither is present —
+    this covers the Organization detail view itself, where the
+    organization IS the resource being addressed by `pk`. The order
+    matters: a membership-detail URL has both organization_pk AND pk
+    (pk = membership id there), so organization_pk must win first.
     """
-    org_id = view.kwargs.get("organization_pk") or view.kwargs.get("org_id")
+    org_id = (
+        view.kwargs.get("organization_pk")
+        or view.kwargs.get("org_id")
+        or view.kwargs.get("pk")
+    )
     if not org_id:
         return None
     return Organization.objects.filter(pk=org_id).first()
@@ -77,7 +84,6 @@ class IsOrganizationMember(permissions.BasePermission):
         return True
 
 
-
 def has_role(minimum_role):
     class _HasRole(permissions.BasePermission):
         def has_permission(self, request, view):
@@ -85,4 +91,5 @@ def has_role(minimum_role):
             if membership is None:
                 return False
             return ROLE_RANK.get(membership.role, -1) >= ROLE_RANK.get(minimum_role, -1)
+
     return _HasRole

@@ -1,9 +1,10 @@
-import uuid 
+import uuid
 
 from django.db import models
 from django.conf import settings
 
-from common.models import BaseModel 
+from common.models import BaseModel
+
 
 class Organization(BaseModel):
     """
@@ -16,10 +17,11 @@ class Organization(BaseModel):
         SUSPENDED = "SUSPENDED", "Suspended"
         DELETED = "DELETED", "Deleted"
 
-
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.ACTIVE
+    )
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -30,7 +32,6 @@ class Organization(BaseModel):
         return self.name
 
 
-
 class MemberShip(BaseModel):
     """
     Join of User <-> Organization, carrying role.
@@ -38,6 +39,7 @@ class MemberShip(BaseModel):
     Deliberately does NOT inherit TenantScopedModel even though it has an
     `organization` FK — see explanation below the code.
     """
+
     class Role(models.TextChoices):
         OWNER = "OWNER", "Owner"
         ADMIN = "ADMIN", "Admin"
@@ -48,11 +50,16 @@ class MemberShip(BaseModel):
         ACTIVE = "ACTIVE", "Active"
         SUSPENDED = "SUSPENDED", "Suspended"
 
-
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="memberships")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="memberships"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships"
+    )
     role = models.CharField(max_length=20, choices=Role.choices)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.ACTIVE
+    )
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -69,13 +76,11 @@ class MemberShip(BaseModel):
         return f"{self.user_id} @ {self.organization_id} ({self.role})"
 
 
-
-
-
 class OrganizationSettings(BaseModel):
     """
     Split from Organization so the hot, frequently-read org row stays small.
     """
+
     organization = models.OneToOneField(
         Organization, on_delete=models.CASCADE, related_name="settings"
     )
