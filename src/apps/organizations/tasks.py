@@ -5,7 +5,6 @@ from django.conf import settings
 from apps.organizations.models import OrganizationInvitation
 
 
-
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_invitation_email(self, invitation_id, invitation_token):
     """

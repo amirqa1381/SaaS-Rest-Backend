@@ -1,6 +1,11 @@
 from rest_framework import serializers
 
-from apps.organizations.models import Organization, MemberShip, OrganizationSettings
+from apps.organizations.models import (
+    Organization,
+    MemberShip,
+    OrganizationSettings,
+    OrganizationInvitation,
+)
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -68,3 +73,59 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+# ================== invitation serializers ==================
+
+
+class InvitationCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=255)
+    role = serializers.ChoiceField(choices=OrganizationInvitation.InvitableRole.choices)
+
+    def validate_email(self, value):
+        """
+        normalize the email to lowercase and validate that it is not already a member of the organization.
+        """
+        value = value.lower()
+        organization = self.context["organization"]
+        if organization.memberships.filter(
+            user__email=value, status=MemberShip.Status.ACTIVE
+        ).exists():
+            raise serializers.ValidationError(
+                "This user is already a member of the organization."
+            )
+
+        if organization.invitations.filter(
+            email=value, status=OrganizationInvitation.Status.PENDING
+        ).exists():
+            raise serializers.ValidationError(
+                "This user has already been invited to the organization."
+            )
+        return value
+
+
+class InvitationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrganizationInvitation
+        fields = [
+            "id",
+            "email",
+            "role",
+            "status",
+            "invited_by",
+            "expires_at",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "email",
+            "status",
+            "role",
+            "invited_by",
+            "expires_at",
+            "created_at",
+        ]
+
+
+class AcceptInvitationSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=255)
