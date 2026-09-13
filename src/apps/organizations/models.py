@@ -92,17 +92,16 @@ class OrganizationSettings(BaseModel):
         return f"Settings for {self.organization_id}"
 
 
-
 class OrganizationInvitation(BaseModel):
     """
     Represents an invitation sent to a user to join an organization.
     """
+
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
         EXPIRED = "EXPIRED", "Expired"
         ACCEPTED = "ACCEPTED", "Accepted"
         REVOKED = "REVOKED", "Revoked"
-
 
     class InvitableRole(models.TextChoices):
         ADMIN = "ADMIN", "Admin"
@@ -118,10 +117,11 @@ class OrganizationInvitation(BaseModel):
     )
     role = models.CharField(max_length=20, choices=InvitableRole.choices)
     token_hash = models.CharField(max_length=64, unique=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
     accepted_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField()
-
 
     class Meta:
         constraints = [
@@ -137,4 +137,3 @@ class OrganizationInvitation(BaseModel):
                 name="org_invitation_status_idx",
             ),
         ]
-            
