@@ -27,7 +27,6 @@ def send_invitation_email(self, invitation_id, invitation_token):
             f"{settings.FRONTEND_URL}/accept-invitation?token={invitation_token}\n\n"
             f"This invitation will expire on {invitation.expires_at}.\n\n"
             f"Best regards,\n"
-            f"The {settings.APP_NAME} Team"
         )
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [invitation.email])
     except Exception as exc:

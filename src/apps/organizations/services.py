@@ -1,6 +1,7 @@
 import secrets
 import hashlib
-from datetime import timezone
+
+from django.utils import timezone
 from django.db import transaction
 from django.utils.text import slugify
 from django.db import IntegrityError

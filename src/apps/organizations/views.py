@@ -237,13 +237,13 @@ class InvitationListCreateView(generics.GenericAPIView):
     permission_classes = [IsOrganizationMember]
 
     def get(self, request, *args, **kwargs):
-        organization = resolve_organization(request, kwargs)
+        organization = resolve_organization(self)
         invitations = organization.invitations.all().order_by("-created_at")
         serializer = InvitationSerializer(invitations, many=True)
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs):
-        organization = resolve_organization(request, kwargs)
+        organization = resolve_organization(self)
         serializer = InvitationCreateSerializer(data=request.data, context={"organization": organization})
         serializer.is_valid(raise_exception=True)
 
@@ -267,7 +267,7 @@ class InvitationRevokeView(APIView):
     permission_classes = [IsOrganizationMember]
 
     def post(self, request, *args, **kwargs):
-        organization = resolve_organization(request, kwargs)
+        organization = resolve_organization(self)
         invitation = get_object_or_404(OrganizationInvitation, pk=kwargs["invitation_pk"], organization=organization)
         try:
             revoke_invitation(request.user, invitation=invitation)
