@@ -1,15 +1,22 @@
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from apps.organizations.models import Organization, MemberShip
-from apps.organizations.permissions import IsOrganizationMember, get_active_membership
+from django.shortcuts import get_object_or_404
+
+from apps.organizations.models import Organization, MemberShip, OrganizationInvitation
+from apps.organizations.permissions import IsOrganizationMember, get_active_membership, resolve_organization
 from apps.organizations.serializers import (
     OrganizationSerializer,
     OrganizationCreateSerializer,
     MembershipSerializer,
     MembershipRoleUpdateSerializer,
     OrganizationSettingsSerializer,
+    InvitationCreateSerializer,
+    InvitationSerializer,
+    AcceptInvitationSerializer
 )
 from apps.organizations.services import (
     create_organization,
@@ -22,6 +29,9 @@ from apps.organizations.services import (
     NotAMemberError,
     CannotRemoveLastOwnerError,
     CannotActOnSelfError,
+    invite_member,
+    accept_invitation,
+    revoke_invitation,
 )
 from common.permissions import IsObjectInUsersOrganization
 
@@ -216,3 +226,77 @@ class MembershipDetailView(generics.GenericAPIView):
             return _service_error_response(exc)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class InvitationListCreateView(generics.GenericAPIView):
+    """
+    class base view for: 
+    GET  /api/v1/organizations/{organization_pk}/invitations/
+    POST /api/v1/organizations/{organization_pk}/invitations/
+    """
+    permission_classes = [IsOrganizationMember]
+
+    def get(self, request, *args, **kwargs):
+        organization = resolve_organization(request, kwargs)
+        invitations = organization.invitations.all().order_by("-created_at")
+        serializer = InvitationSerializer(invitations, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        organization = resolve_organization(request, kwargs)
+        serializer = InvitationCreateSerializer(data=request.data, context={"organization": organization})
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            invitation = invite_member(
+                actor=request.user,
+                organization=organization,
+                email=serializer.validated_data["email"],
+                role=serializer.validated_data["role"]
+            )
+        except OrganizationServiceError as exc:
+            return _service_error_response(exc)
+
+        return Response(InvitationSerializer(invitation).data, status=status.HTTP_201_CREATED)
+
+class InvitationRevokeView(APIView):
+    """
+    POST /api/v1/organizations/{organization_pk}/invitations/{invitation_pk}/revoke/
+    """
+
+    permission_classes = [IsOrganizationMember]
+
+    def post(self, request, *args, **kwargs):
+        organization = resolve_organization(request, kwargs)
+        invitation = get_object_or_404(OrganizationInvitation, pk=kwargs["invitation_pk"], organization=organization)
+        try:
+            revoke_invitation(request.user, invitation=invitation)
+
+        except OrganizationServiceError as exc:
+            return _service_error_response(exc)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class InvitationAcceptView(APIView):
+    """
+    POST /api/v1/organizations/invitations/accept/
+    Not org-scoped — the invitee isn't a member of anything yet.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = AcceptInvitationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            token = serializer.validated_data["token"]
+            membership = accept_invitation(token=token, user=request.user)
+
+        except OrganizationServiceError as exc:
+            return _service_error_response(exc)
+
+        return Response(data={
+            "organization": str(membership.organization_id),
+            "role": membership.role
+        }, status=status.HTTP_200_OK)
