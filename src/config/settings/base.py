@@ -139,6 +139,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
+    "SIGNING_KEY": env("JWT_SIGNING_KEY"),
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,

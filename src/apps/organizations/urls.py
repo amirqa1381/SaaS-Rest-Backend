@@ -31,3 +31,22 @@ urlpatterns = [
         name="membership-detail",
     ),
 ]
+
+
+urlpatterns += [
+    path(
+        "<uuid:organization_pk>/invitations/",
+        views.InvitationListCreateView.as_view(),
+        name="invitation-list-create",
+    ),
+    path(
+        "<uuid:organization_pk>/invitations/<uuid:invitation_pk>/revoke/",
+        views.InvitationRevokeView.as_view(),
+        name="invitation-revoke",
+    ),
+    path(
+        "invitations/accept/",
+        views.InvitationAcceptView.as_view(),
+        name="invitation-accept",
+    ),
+]

@@ -1,7 +1,15 @@
+import secrets
+import hashlib
+
+from django.utils import timezone
 from django.db import transaction
 from django.utils.text import slugify
-from apps.organizations.models import Organization, MemberShip
+from django.db import IntegrityError
+from apps.organizations.models import Organization, MemberShip, OrganizationInvitation
 from apps.organizations.permissions import get_active_membership, ROLE_RANK
+from apps.organizations.tasks import send_invitation_email
+
+# ====================== Exception part =====================
 
 
 class OrganizationServiceError(Exception):
@@ -22,6 +30,25 @@ class CannotRemoveLastOwnerError(OrganizationServiceError):
 
 class CannotActOnSelfError(OrganizationServiceError):
     """Raised when a user tries to change/remove their own membership."""
+
+
+class InvitationServiceError(OrganizationServiceError):
+    pass
+
+
+class DuplicatePendingInvitationError(InvitationServiceError):
+    pass
+
+
+class InvalidOrExpiredInvitationError(InvitationServiceError):
+    pass
+
+
+class InvitationAlreadyHandledError(InvitationServiceError):
+    pass
+
+
+# ===================== organization creation services =====================
 
 
 def create_organization(*, owner, name):
@@ -259,3 +286,178 @@ def leave_organization(*, actor, organization):
                 )
 
         actor_membership.delete()
+
+
+def _generate_token():
+    """
+    Generates a secure random token for invitations.
+    """
+    return secrets.token_urlsafe(32)
+
+
+def _hash_token(token):
+    """
+    Hashes the token using SHA-256 for secure storage.
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def invite_member(*, actor, organization, email, role):
+    """
+    Invites a new member to an organization by creating an Invitation
+    record. The invited user will receive an email with a unique token
+    to accept the invitation and join the organization.
+    """
+    actor_membership = get_active_membership(actor, organization)
+
+    if actor_membership is None:
+        raise NotAMemberError("You are not a member of this organization.")
+
+    if ROLE_RANK[actor_membership.role] not in (
+        ROLE_RANK[MemberShip.Role.ADMIN],
+        ROLE_RANK[MemberShip.Role.OWNER],
+    ):
+        raise InsufficientRoleError(
+            "Only ADMIN or OWNER can invite new members to the organization."
+        )
+
+    if role not in (
+        MemberShip.Role.ADMIN,
+        MemberShip.Role.MANAGER,
+        MemberShip.Role.MEMBER,
+    ):
+        raise InvitationServiceError(
+            f"'{role}' is not a valid role to invite a member as."
+        )
+
+    if ROLE_RANK[actor_membership.role] <= ROLE_RANK[role]:
+        raise InsufficientRoleError(
+            "You cannot invite a member with a role equal to or above your own."
+        )
+
+    # normalize the email to lowercase for consistency
+    # check if the email is already a member or has a pending invitation
+
+    normalized_email = email.strip().lower()
+    already_member = MemberShip.objects.filter(
+        organization=organization,
+        user__email=normalized_email,
+        status=MemberShip.Status.ACTIVE,
+    ).exists()
+    pending_invitation = organization.invitations.filter(
+        email=normalized_email, status=OrganizationInvitation.Status.PENDING
+    ).exists()
+
+    if already_member:
+        raise InvitationServiceError(
+            f"The email '{normalized_email}' is already a member of the organization."
+        )
+
+    if pending_invitation:
+        raise DuplicatePendingInvitationError(
+            f"There is already a pending invitation for '{normalized_email}'."
+        )
+
+    with transaction.atomic():
+        raw_token = _generate_token()
+        token_hash = _hash_token(raw_token)
+
+        try:
+            invitation = OrganizationInvitation.objects.create(
+                organization=organization,
+                email=normalized_email,
+                invited_by=actor,
+                role=role,
+                token_hash=token_hash,
+                status=OrganizationInvitation.Status.PENDING,
+                expires_at=timezone.now()
+                + timezone.timedelta(days=7),  # Example: invitation expires in 7 days
+            )
+        except IntegrityError as e:
+            raise DuplicatePendingInvitationError(
+                f"There is already a pending invitation for '{normalized_email}'."
+            )
+    # sending the email
+    send_invitation_email.delay_on_commit(invitation.id, raw_token)
+
+    return invitation
+
+
+def accept_invitation(*, token, user):
+    """..."""
+    token_hash = _hash_token(token)
+
+    with transaction.atomic():
+        try:
+            invitation = OrganizationInvitation.objects.select_for_update().get(
+                token_hash=token_hash
+            )
+        except OrganizationInvitation.DoesNotExist:
+            raise InvalidOrExpiredInvitationError(
+                "Invalid or expired invitation token."
+            )
+
+        if invitation.status != OrganizationInvitation.Status.PENDING:
+            raise InvitationAlreadyHandledError(
+                "This invitation has already been handled."
+            )
+
+        if invitation.expires_at < timezone.now():
+            raise InvalidOrExpiredInvitationError("This invitation has expired.")
+
+        if user.email.strip().lower() != invitation.email:
+            raise InvitationServiceError(
+                "This invitation was not issued to your account."
+            )
+
+        already_member = MemberShip.objects.filter(
+            organization=invitation.organization, user=user
+        ).exists()
+
+        if already_member:
+            raise InvitationServiceError(
+                "You are already a member of this organization."
+            )
+
+        membership = MemberShip.objects.create(
+            organization=invitation.organization,
+            user=user,
+            role=invitation.role,
+            status=MemberShip.Status.ACTIVE,
+        )
+
+        invitation.status = OrganizationInvitation.Status.ACCEPTED
+        invitation.accepted_at = timezone.now()
+        invitation.save(update_fields=["status", "accepted_at", "updated_at"])
+
+    return membership
+
+
+def revoke_invitation(*, actor, invitation):
+    """
+    Revokes a pending invitation. Only the inviter or an ADMIN/OWNER
+    of the organization can revoke an invitation.
+    """
+    organization = invitation.organization
+    actor_membership = get_active_membership(actor, organization)
+
+    if actor_membership is None:
+        raise NotAMemberError("You are not a member of this organization.")
+
+    if actor_membership.role not in (MemberShip.Role.ADMIN, MemberShip.Role.OWNER):
+        raise InsufficientRoleError(
+            "Only the inviter or an ADMIN/OWNER can revoke this invitation."
+        )
+
+    with transaction.atomic():
+        invitation = OrganizationInvitation.objects.select_for_update().get(
+            pk=invitation.pk
+        )
+
+        if invitation.status != OrganizationInvitation.Status.PENDING:
+            raise InvitationAlreadyHandledError(
+                "This invitation has already been handled."
+            )
+
+        invitation.status = OrganizationInvitation.Status.REVOKED
+        invitation.save(update_fields=["status", "updated_at"])

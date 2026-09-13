@@ -90,3 +90,50 @@ class OrganizationSettings(BaseModel):
 
     def __str__(self):
         return f"Settings for {self.organization_id}"
+
+
+class OrganizationInvitation(BaseModel):
+    """
+    Represents an invitation sent to a user to join an organization.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        EXPIRED = "EXPIRED", "Expired"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        REVOKED = "REVOKED", "Revoked"
+
+    class InvitableRole(models.TextChoices):
+        ADMIN = "ADMIN", "Admin"
+        MANAGER = "MANAGER", "Manager"
+        MEMBER = "MEMBER", "Member"
+
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="invitations"
+    )
+    email = models.EmailField(max_length=255)
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    role = models.CharField(max_length=20, choices=InvitableRole.choices)
+    token_hash = models.CharField(max_length=64, unique=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "email"],
+                condition=models.Q(status="PENDING"),
+                name="unique_pending_invitation_per_org_email",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["organization", "status"],
+                name="org_invitation_status_idx",
+            ),
+        ]
