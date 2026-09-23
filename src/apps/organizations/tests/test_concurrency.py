@@ -4,7 +4,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 from django.db import close_old_connections
 
-from apps.organizations.models import OrganizationInvitation, Membership
+from apps.organizations.models import OrganizationInvitation, MemberShip
 from apps.organizations.services import accept_invitation, InvitationAlreadyHandledError
 from .factories import OrganizationInvitationFactory, OrganizationFactory, UserFactory
 from apps.organizations.services import _hash_token
@@ -55,4 +55,4 @@ class TestAcceptInvitationConcurrency(TransactionTestCase):
         assert all(isinstance(e, InvitationAlreadyHandledError) for e in errors)
 
         # exactly one Membership row was created — no duplicates
-        assert Membership.objects.filter(organization=org, user=user).count() == 1
+        assert MemberShip.objects.filter(organization=org, user=user).count() == 1
