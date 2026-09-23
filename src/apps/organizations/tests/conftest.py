@@ -64,3 +64,13 @@ def authed_client_b(api_client, user_b, membership_b):
     """APIClient authenticated as user_b (member of org_b only)."""
     api_client.force_authenticate(user=user_b)
     return api_client
+
+
+@pytest.fixture
+def member_factory():
+    """Creates a user with an ACTIVE membership at the given role in the given org."""
+    def _make(organization, role):
+        user = UserFactory()
+        MembershipFactory(organization=organization, user=user, role=role)
+        return user
+    return _make

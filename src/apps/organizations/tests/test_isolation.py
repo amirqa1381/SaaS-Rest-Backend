@@ -1,6 +1,9 @@
 import pytest
 from django.urls import reverse
 
+from .factories import OrganizationInvitationFactory
+from apps.organizations.models import OrganizationInvitation
+
 pytestmark = pytest.mark.django_db
 
 
@@ -92,3 +95,37 @@ class TestCrossTenantViaQueryParams:
         )
         assert str(org_a.id) in returned_ids
         assert str(org_b.id) not in returned_ids
+
+
+class TestInvitationIsolation:
+    def test_cannot_list_other_orgs_invitations(self, authed_client_a, org_b):
+        OrganizationInvitationFactory(organization=org_b)
+        url = reverse("organizations:invitation-list-create", kwargs={"organization_pk": org_b.id})
+        response = authed_client_a.get(url)
+        assert response.status_code in (403, 404)
+
+    def test_cannot_create_invitation_in_other_org(self, authed_client_a, org_b):
+        url = reverse("organizations:invitation-list-create", kwargs={"organization_pk": org_b.id})
+        response = authed_client_a.post(url, {"email": "x@example.com", "role": "MEMBER"})
+        assert response.status_code in (403, 404)
+
+    def test_cannot_revoke_other_orgs_invitation(self, authed_client_a, org_b):
+        invitation = OrganizationInvitationFactory(organization=org_b, status=OrganizationInvitation.Status.PENDING)
+        url = reverse(
+            "organizations:invitation-revoke",
+            kwargs={"organization_pk": org_b.id, "invitation_pk": invitation.id},
+        )
+        response = authed_client_a.post(url)
+        assert response.status_code in (403, 404)
+        invitation.refresh_from_db()
+        assert invitation.status == OrganizationInvitation.Status.PENDING  # untouched
+
+    def test_cannot_revoke_own_orgs_invitation_via_wrong_org_id_in_url(self, authed_client_a, org_a, org_b):
+        """Invitation belongs to org_a, but URL claims org_b — should not resolve."""
+        invitation = OrganizationInvitationFactory(organization=org_a, status=OrganizationInvitation.Status.PENDING)
+        url = reverse(
+            "organizations:invitation-revoke",
+            kwargs={"organization_pk": org_b.id, "invitation_pk": invitation.id},
+        )
+        response = authed_client_a.post(url)
+        assert response.status_code == 404
