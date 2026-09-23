@@ -44,7 +44,7 @@ LOCAL_APPS = [
     # Domain apps get added here as milestones land, e.g.:
     "apps.accounts",
     "apps.organizations.apps.OrganizationsConfig",
-    # "apps.projects",
+    "apps.projects",
     # "apps.tasks",
     # "apps.notifications",
     # "apps.audit",
