@@ -1,6 +1,7 @@
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils import timezone
 
 from apps.organizations.models import OrganizationInvitation
 
@@ -31,3 +32,18 @@ def send_invitation_email(self, invitation_id, invitation_token):
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [invitation.email])
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
+@shared_task
+def sweep_expired_invitations():
+    """
+    Flips any PENDING invitation past its expires_at to EXPIRED.
+    Idempotent by construction — re-running with nothing to expire is a
+    no-op, so no retry/lock logic is needed (architecture doc §11).
+    """
+    updated_count = OrganizationInvitation.objects.filter(
+        status=OrganizationInvitation.Status.PENDING,
+        expires_at__lt=timezone.now(),
+    ).update(status=OrganizationInvitation.Status.EXPIRED)
+
+    return updated_count

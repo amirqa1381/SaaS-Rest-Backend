@@ -1,7 +1,9 @@
 import pytest
 from unittest.mock import patch
 
-from apps.organizations.models import Organization, MemberShip
+from datetime import timedelta
+from django.utils import timezone
+from apps.organizations.models import Organization, MemberShip, OrganizationInvitation
 from apps.organizations.services import (
     create_organization,
     update_organization,
@@ -13,8 +15,16 @@ from apps.organizations.services import (
     InsufficientRoleError,
     CannotRemoveLastOwnerError,
     CannotActOnSelfError,
+    accept_invitation,
+    invite_member,
+    revoke_invitation,
+    InvitationServiceError,
+    InvitationAlreadyHandledError,
+    DuplicatePendingInvitationError,
+    InvalidOrExpiredInvitationError,
 )
-from .factories import UserFactory, OrganizationFactory, MembershipFactory
+
+from .factories import UserFactory, OrganizationInvitationFactory, MembershipFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -375,3 +385,200 @@ class TestLeaveOrganization:
     def test_non_member_cannot_leave(self, org_a, user_b):
         with pytest.raises(NotAMemberError):
             leave_organization(actor=user_b, organization=org_a)
+
+
+# ---------------------------------------------------------------------------
+# invite_member
+# ---------------------------------------------------------------------------
+
+
+class TestInviteMember:
+    def test_owner_can_invite_member(self, org_a, user_a, membership_a):
+        invitation = invite_member(
+            actor=user_a, organization=org_a, email="new@example.com", role="MEMBER"
+        )
+        assert invitation.status == OrganizationInvitation.Status.PENDING
+        assert invitation.email == "new@example.com"
+        assert invitation.invited_by == user_a
+
+    def test_email_normalized_to_lowercase(self, org_a, user_a, membership_a):
+        invitation = invite_member(
+            actor=user_a, organization=org_a, email="NEW@Example.COM", role="MEMBER"
+        )
+        assert invitation.email == "new@example.com"
+
+    def test_non_member_cannot_invite(self, org_a, user_b):
+        with pytest.raises(NotAMemberError):
+            invite_member(actor=user_b, organization=org_a, email="x@example.com", role="MEMBER")
+
+    def test_member_role_cannot_invite(self, org_a):
+        member_user = UserFactory()
+        MembershipFactory(
+            organization=org_a, user=member_user, role=MemberShip.Role.MEMBER
+        )
+
+        with pytest.raises(InsufficientRoleError):
+            invite_member(actor=member_user, organization=org_a, email="x@example.com", role="MEMBER")
+
+    def test_admin_cannot_invite_equal_or_higher_role(self, org_a):
+        admin_user = UserFactory()
+        MembershipFactory(
+            organization=org_a, user=admin_user, role=MemberShip.Role.ADMIN
+        )
+
+        with pytest.raises(InsufficientRoleError):
+            invite_member(actor=admin_user, organization=org_a, email="x@example.com", role="ADMIN")
+
+    def test_cannot_invite_as_owner(self, org_a, user_a, membership_a):
+        with pytest.raises(InvitationServiceError):
+            invite_member(actor=user_a, organization=org_a, email="x@example.com", role="OWNER")
+
+    def test_duplicate_pending_invitation_rejected(self, org_a, user_a, membership_a):
+        invite_member(actor=user_a, organization=org_a, email="dup@example.com", role="MEMBER")
+        with pytest.raises(DuplicatePendingInvitationError):
+            invite_member(actor=user_a, organization=org_a, email="dup@example.com", role="MEMBER")
+
+    def test_already_member_rejected(self, org_a, user_a, membership_a):
+        with pytest.raises(InvitationServiceError):
+            invite_member(actor=user_a, organization=org_a, email=user_a.email, role="MEMBER")
+
+    def test_can_reinvite_after_previous_invitation_revoked(self, org_a, user_a, membership_a):
+        first = invite_member(actor=user_a, organization=org_a, email="again@example.com", role="MEMBER")
+        revoke_invitation(actor=user_a, invitation=first)
+        second = invite_member(actor=user_a, organization=org_a, email="again@example.com", role="MEMBER")
+        assert second.status == OrganizationInvitation.Status.PENDING
+
+
+# ---------------------------------------------------------------------------
+# accept_invitation
+# ---------------------------------------------------------------------------
+
+
+class TestAcceptInvitation:
+    def test_valid_invitation_creates_membership(self, org_a, user_a, user_b):
+        raw_token = "raw-token-123"
+        invitation = OrganizationInvitationFactory(
+            organization=org_a,
+            email=user_b.email,
+            token_hash=_hash_for_test(raw_token),
+            status=OrganizationInvitation.Status.PENDING,
+        )
+        membership = accept_invitation(token=raw_token, user=user_b)
+        assert membership.organization == org_a
+        assert membership.user == user_b
+        assert membership.role == invitation.role
+        invitation.refresh_from_db()
+        assert invitation.status == OrganizationInvitation.Status.ACCEPTED
+        assert invitation.accepted_at is not None
+
+    def test_invalid_token_raises(self, user_b):
+        with pytest.raises(InvalidOrExpiredInvitationError):
+            accept_invitation(token="garbage-token", user=user_b)
+
+    def test_expired_invitation_raises(self, org_a, user_b):
+        raw_token = "raw-token-expired"
+        OrganizationInvitationFactory(
+            organization=org_a,
+            email=user_b.email,
+            token_hash=_hash_for_test(raw_token),
+            status=OrganizationInvitation.Status.PENDING,
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        with pytest.raises(InvalidOrExpiredInvitationError):
+            accept_invitation(token=raw_token, user=user_b)
+
+    def test_already_accepted_invitation_raises(self, org_a, user_b):
+        raw_token = "raw-token-used"
+        OrganizationInvitationFactory(
+            organization=org_a,
+            email=user_b.email,
+            token_hash=_hash_for_test(raw_token),
+            status=OrganizationInvitation.Status.ACCEPTED,
+        )
+        with pytest.raises(InvitationAlreadyHandledError):
+            accept_invitation(token=raw_token, user=user_b)
+
+    def test_revoked_invitation_raises(self, org_a, user_b):
+        raw_token = "raw-token-revoked"
+        OrganizationInvitationFactory(
+            organization=org_a,
+            email=user_b.email,
+            token_hash=_hash_for_test(raw_token),
+            status=OrganizationInvitation.Status.REVOKED,
+        )
+        with pytest.raises(InvitationAlreadyHandledError):
+            accept_invitation(token=raw_token, user=user_b)
+
+    def test_email_mismatch_raises(self, org_a, user_b):
+        raw_token = "raw-token-mismatch"
+        OrganizationInvitationFactory(
+            organization=org_a,
+            email="someone-else@example.com",
+            token_hash=_hash_for_test(raw_token),
+            status=OrganizationInvitation.Status.PENDING,
+        )
+        with pytest.raises(InvitationServiceError):
+            accept_invitation(token=raw_token, user=user_b)
+
+    def test_already_member_raises(self, org_a, user_a, membership_a):
+        # user_a is already OWNER/member of org_a
+        raw_token = "raw-token-already-member"
+        OrganizationInvitationFactory(
+            organization=org_a,
+            email=user_a.email,
+            token_hash=_hash_for_test(raw_token),
+            status=OrganizationInvitation.Status.PENDING,
+        )
+        with pytest.raises(InvitationServiceError):
+            accept_invitation(token=raw_token, user=user_a)
+
+    def test_second_accept_of_same_token_fails(self, org_a, user_b):
+        """Sequential double-accept — the non-concurrent version of the race test below."""
+        raw_token = "raw-token-double"
+        OrganizationInvitationFactory(
+            organization=org_a,
+            email=user_b.email,
+            token_hash=_hash_for_test(raw_token),
+            status=OrganizationInvitation.Status.PENDING,
+        )
+        accept_invitation(token=raw_token, user=user_b)
+        with pytest.raises(InvitationAlreadyHandledError):
+            accept_invitation(token=raw_token, user=user_b)
+
+
+# ---------------------------------------------------------------------------
+# revoke_invitation
+# ---------------------------------------------------------------------------
+
+
+class TestRevokeInvitation:
+    def test_owner_can_revoke_pending_invitation(self, org_a, user_a, membership_a):
+        invitation = OrganizationInvitationFactory(organization=org_a, status=OrganizationInvitation.Status.PENDING)
+        revoke_invitation(actor=user_a, invitation=invitation)
+        invitation.refresh_from_db()
+        assert invitation.status == OrganizationInvitation.Status.REVOKED
+
+    def test_non_member_cannot_revoke(self, org_a, user_b):
+        invitation = OrganizationInvitationFactory(organization=org_a, status=OrganizationInvitation.Status.PENDING)
+        with pytest.raises(NotAMemberError):
+            revoke_invitation(actor=user_b, invitation=invitation)
+
+    def test_member_without_rank_and_not_inviter_cannot_revoke(self, org_a):
+        member_user = UserFactory()
+        MembershipFactory(
+            organization=org_a, user=member_user, role=MemberShip.Role.MEMBER
+        )
+        invitation = OrganizationInvitationFactory(organization=org_a, status=OrganizationInvitation.Status.PENDING)
+
+        with pytest.raises(InsufficientRoleError):
+            revoke_invitation(actor=member_user, invitation=invitation)
+
+    def test_cannot_revoke_already_accepted(self, org_a, user_a, membership_a):
+        invitation = OrganizationInvitationFactory(organization=org_a, status=OrganizationInvitation.Status.ACCEPTED)
+        with pytest.raises(InvitationAlreadyHandledError):
+            revoke_invitation(actor=user_a, invitation=invitation)
+
+
+def _hash_for_test(raw_token):
+    from apps.organizations.services import _hash_token
+    return _hash_token(raw_token)

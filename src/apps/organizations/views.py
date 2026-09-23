@@ -270,7 +270,7 @@ class InvitationRevokeView(APIView):
         organization = resolve_organization(self)
         invitation = get_object_or_404(OrganizationInvitation, pk=kwargs["invitation_pk"], organization=organization)
         try:
-            revoke_invitation(request.user, invitation=invitation)
+            revoke_invitation(actor=request.user, invitation=invitation)
 
         except OrganizationServiceError as exc:
             return _service_error_response(exc)

@@ -1,7 +1,9 @@
 import factory
 from factory.django import DjangoModelFactory
 
-from apps.organizations.models import Organization, MemberShip, OrganizationSettings
+from datetime import timedelta
+from django.utils import timezone
+from apps.organizations.models import Organization, MemberShip, OrganizationInvitation
 from apps.accounts.models import User
 
 
@@ -39,3 +41,15 @@ class MembershipFactory(DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     role = MemberShip.Role.MEMBER
     status = MemberShip.Status.ACTIVE
+
+
+class OrganizationInvitationFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = OrganizationInvitation
+
+    organization = factory.SubFactory("apps.organizations.tests.factories.OrganizationFactory")
+    email = factory.Sequence(lambda n: f"invitee{n}@example.com")
+    role = OrganizationInvitation.InvitableRole.MEMBER
+    token_hash = factory.Sequence(lambda n: f"fake-token-hash-{n}")
+    status = OrganizationInvitation.Status.PENDING
+    expires_at = factory.LazyFunction(lambda: timezone.now() + timedelta(days=7))
