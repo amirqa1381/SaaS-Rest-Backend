@@ -128,4 +128,4 @@ class TestInvitationIsolation:
             kwargs={"organization_pk": org_b.id, "invitation_pk": invitation.id},
         )
         response = authed_client_a.post(url)
-        assert response.status_code == 404
+        assert response.status_code == 403
